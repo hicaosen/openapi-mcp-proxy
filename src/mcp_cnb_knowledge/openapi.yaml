@@ -13,7 +13,23 @@ paths:
     post:
       operationId: queryKnowledgeBase
       summary: 查询知识库
-      description: 在指定仓库的知识库中搜索相关文档片段
+      description: |
+        在指定仓库的知识库中搜索相关文档片段（基于 RAG 技术）。
+
+        **功能说明：**
+        - 使用向量语义搜索，理解查询意图而非简单关键词匹配
+        - 返回最相关的文档片段及其相关度分数
+        - 支持中英文查询
+
+        **使用场景：**
+        - 查找特定功能的使用方法或配置说明
+        - 定位错误排查步骤或常见问题解答
+        - 了解项目架构、技术栈或设计决策
+        - 搜索代码示例或 API 使用方式
+
+        **注意事项：**
+        - 仓库必须已启用知识库功能
+        - 需要对仓库有读取权限（repo-code:r）
       tags:
         - knowledge-base
       parameters:
@@ -35,11 +51,31 @@ paths:
               properties:
                 query:
                   type: string
-                  description: 搜索关键词或问题
-                  example: "如何配置知识库"
+                  description: |
+                    自然语言查询，用于语义搜索相关文档片段。
+
+                    **最佳实践：**
+                    - ✅ 使用完整的问题句子（如"如何配置 FastMCP 集成？"）
+                    - ✅ 描述具体的使用场景或问题（如"用户认证失败时如何调试？"）
+                    - ✅ 包含上下文信息（如"Python 中如何异步调用 API？"）
+                    - ❌ 避免单个关键词（如"配置"、"API"）
+                    - ❌ 避免过于宽泛的问题（如"这个项目是做什么的？"）
+
+                    **系统特性：** 使用向量语义搜索，能理解问题含义，不仅仅是关键词匹配。
+                  examples:
+                    - "如何配置 CNB 访问令牌？"
+                    - "FastMCP 框架的主要特性是什么？"
+                    - "遇到 401 认证错误应该如何排查？"
+                    - "Python 代码中如何直接调用查询 API？"
                 top_k:
                   type: integer
-                  description: 最大返回结果数
+                  description: |
+                    返回的最相关文档片段数量。
+
+                    **使用建议：**
+                    - 精确问题：使用较小值（3-5），获取最相关的内容
+                    - 探索性查询：使用较大值（10-20），获取更全面的信息
+                    - 默认值 5 适合大多数场景
                   default: 5
                   minimum: 1
                   maximum: 20
@@ -49,37 +85,40 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    score:
-                      type: number
-                      format: float
-                      description: 相关度分数（0-1）
-                      example: 0.95
-                    chunk:
-                      type: string
-                      description: 匹配的文档片段
-                    metadata:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
                       type: object
                       properties:
-                        hash:
-                          type: string
-                          description: 文档哈希值
-                        name:
-                          type: string
-                          description: 文档名称
-                        path:
-                          type: string
-                          description: 文档路径
-                        position:
-                          type: integer
-                          description: 片段在文档中的位置
                         score:
                           type: number
                           format: float
-                          description: 相关度分数（与顶层score相同）
+                          description: 相关度分数（0-1）
+                          example: 0.95
+                        chunk:
+                          type: string
+                          description: 匹配的文档片段
+                        metadata:
+                          type: object
+                          properties:
+                            hash:
+                              type: string
+                              description: 文档哈希值
+                            name:
+                              type: string
+                              description: 文档名称
+                            path:
+                              type: string
+                              description: 文档路径
+                            position:
+                              type: integer
+                              description: 片段在文档中的位置
+                            score:
+                              type: number
+                              format: float
+                              description: 相关度分数
         '401':
           description: 认证失败
         '404':
