@@ -150,20 +150,19 @@ asyncio.run(main())
 **返回示例：**
 
 ```json
-{
-  "results": [
-    {
-      "score": 0.95,
-      "chunk": "文档内容片段...",
-      "metadata": {
-        "hash": "abc123",
-        "name": "README.md",
-        "path": "docs/README.md",
-        "position": 0
-      }
+[
+  {
+    "score": 0.95,
+    "chunk": "文档内容片段...",
+    "metadata": {
+      "hash": "abc123",
+      "name": "README.md",
+      "path": "docs/README.md",
+      "position": 0,
+      "score": 0.95
     }
-  ]
-}
+  }
+]
 ```
 
 ## 开发
