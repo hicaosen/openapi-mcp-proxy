@@ -18,6 +18,7 @@ mcp-cnb-knowledge = "mcp_cnb_knowledge.server:run"
 
 [tool.poetry]
 packages = [{include = "mcp_cnb_knowledge", from = "src"}]
+include = ["src/mcp_cnb_knowledge/openapi.yaml"]
 
 
 [tool.poetry.group.dev.dependencies]
