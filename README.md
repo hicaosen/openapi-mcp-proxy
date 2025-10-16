@@ -71,9 +71,7 @@
     "metadata": {
       "hash": "abc123",
       "name": "README.md",
-      "path": "docs/README.md",
-      "position": 0,
-      "score": 0.95
+      "path": "docs/README.md"
     }
   }
 ]

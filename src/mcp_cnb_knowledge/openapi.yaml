@@ -85,40 +85,37 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  results:
-                    type: array
-                    items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    score:
+                      type: number
+                      format: float
+                      description: 相关度分数（0-1）
+                      example: 0.95
+                    chunk:
+                      type: string
+                      description: 匹配的文档片段
+                    metadata:
                       type: object
                       properties:
+                        hash:
+                          type: string
+                          description: 文档哈希值
+                        name:
+                          type: string
+                          description: 文档名称
+                        path:
+                          type: string
+                          description: 文档路径
+                        position:
+                          type: integer
+                          description: 片段在文档中的位置
                         score:
                           type: number
                           format: float
-                          description: 相关度分数（0-1）
-                          example: 0.95
-                        chunk:
-                          type: string
-                          description: 匹配的文档片段
-                        metadata:
-                          type: object
-                          properties:
-                            hash:
-                              type: string
-                              description: 文档哈希值
-                            name:
-                              type: string
-                              description: 文档名称
-                            path:
-                              type: string
-                              description: 文档路径
-                            position:
-                              type: integer
-                              description: 片段在文档中的位置
-                            score:
-                              type: number
-                              format: float
-                              description: 相关度分数
+                          description: 相关度分数
         '401':
           description: 认证失败
         '404':
