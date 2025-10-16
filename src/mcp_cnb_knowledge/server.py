@@ -4,27 +4,25 @@
 """
 
 import os
-from pathlib import Path
 import httpx
 import yaml
 from fastmcp import FastMCP
+from importlib.resources import files
 
 
 def load_openapi_spec() -> dict:
     """加载OpenAPI规范文件"""
-    # 获取项目根目录的openapi.yaml路径
-    current_dir = Path(__file__).parent
-    project_root = current_dir.parent.parent
-    openapi_path = project_root / "openapi.yaml"
-
-    if not openapi_path.exists():
+    # 使用importlib.resources从包中加载openapi.yaml
+    try:
+        package_files = files("mcp_cnb_knowledge")
+        openapi_file = package_files.joinpath("openapi.yaml")
+        spec_content = openapi_file.read_text(encoding="utf-8")
+        return yaml.safe_load(spec_content)
+    except FileNotFoundError:
         raise FileNotFoundError(
-            f"OpenAPI规范文件未找到: {openapi_path}\n"
-            "请确保在项目根目录下有 openapi.yaml 文件"
+            "OpenAPI规范文件未找到\n"
+            "请确保包中包含 openapi.yaml 文件"
         )
-
-    with open(openapi_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
 
 
 def get_cnb_token() -> str:
