@@ -1,0 +1,94 @@
+openapi: 3.0.3
+info:
+  title: CNB Knowledge Base API
+  version: 1.0.0
+  description: CNB仓库知识库查询API，用于检索文档片段（RAG）
+
+servers:
+  - url: https://api.cnb.cool
+    description: CNB API服务器
+
+paths:
+  /{slug}/-/knowledge/base/query:
+    post:
+      operationId: queryKnowledgeBase
+      summary: 查询知识库
+      description: 在指定仓库的知识库中搜索相关文档片段
+      tags:
+        - knowledge-base
+      parameters:
+        - name: slug
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 仓库路径，格式为 owner/repo
+          example: "hicaosen/mcp-cnb-knowledge"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - query
+              properties:
+                query:
+                  type: string
+                  description: 搜索关键词或问题
+                  example: "如何配置知识库"
+                top_k:
+                  type: integer
+                  description: 最大返回结果数
+                  default: 5
+                  minimum: 1
+                  maximum: 20
+      responses:
+        '200':
+          description: 查询成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  results:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        score:
+                          type: number
+                          format: float
+                          description: 相关度分数（0-1）
+                          example: 0.95
+                        chunk:
+                          type: string
+                          description: 匹配的文档片段
+                        metadata:
+                          type: object
+                          properties:
+                            hash:
+                              type: string
+                              description: 文档哈希值
+                            name:
+                              type: string
+                              description: 文档名称
+                            path:
+                              type: string
+                              description: 文档路径
+                            position:
+                              type: integer
+                              description: 片段在文档中的位置
+        '401':
+          description: 认证失败
+        '404':
+          description: 仓库不存在或知识库未构建
+      security:
+        - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: CNB访问令牌，需要 repo-code:r 权限

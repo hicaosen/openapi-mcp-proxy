@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "cnb-knowledge": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/path/to/mcp-cnb-knowledge",
+        "run",
+        "mcp-cnb-knowledge"
+      ],
+      "env": {
+        "CNB_ACCESS_TOKEN": "your_cnb_token_here"
+      }
+    }
+  }
+}
