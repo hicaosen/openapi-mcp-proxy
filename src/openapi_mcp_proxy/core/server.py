@@ -5,10 +5,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Optional
 
+FastMCPOpenAPI = None
+
 try:  # pragma: no cover - imported lazily and mocked in tests
-    from fastmcp.openapi import FastMCPOpenAPI
+    from fastmcp.server.openapi import FastMCPOpenAPI  # type: ignore[assignment]
 except ModuleNotFoundError:  # pragma: no cover - handled at runtime/tests
-    FastMCPOpenAPI = None  # type: ignore[assignment]
+    try:  # Legacy fallback for fastmcp < 2.12
+        from fastmcp.openapi import FastMCPOpenAPI  # type: ignore[assignment]
+    except ModuleNotFoundError:
+        FastMCPOpenAPI = None
 
 from .client import create_http_client
 from .config import RuntimeConfig
@@ -21,7 +26,9 @@ def create_proxy(
     loader: OpenAPISpecLoader | None = None,
 ) -> "FastMCPOpenAPI":
     if FastMCPOpenAPI is None:  # pragma: no cover - requires dependency
-        raise RuntimeError("fastmcp.openapi.FastMCPOpenAPI 不可用，请安装 fastmcp 库。")
+        raise RuntimeError(
+            "FastMCPOpenAPI 不可用，请确认 fastmcp 已安装且版本满足 OpenAPI 支持。"
+        )
 
     loader = loader or OpenAPISpecLoader()
     spec = loader.load(config.openapi_source)
