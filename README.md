@@ -31,7 +31,9 @@
         "--prerelease=allow",
         "--from",
         "git+https://cnb.cool/hicaosen/mcp-cnb-knowledge",
-        "mcp-cnb-knowledge"
+        "mcp-cnb-knowledge",
+        "--openapi-spec",
+        "https://example.com/openapi.yaml"
       ],
       "env": {
         "CNB_ACCESS_TOKEN": "your_token_here"
@@ -48,6 +50,22 @@
 1. 访问 https://cnb.cool/-/user/tokens
 2. 创建新的访问令牌，至少需要 `repo-code:r` 权限
 3. 复制生成的令牌
+
+### 指定 OpenAPI 规范
+
+运行服务器时必须指定 OpenAPI 规范的来源（支持本地路径、`file://`、`http(s)://`）：
+
+- **命令行参数**：启动时传入 `--openapi-spec <路径或URL>`。
+- **环境变量**：设置 `MCP_OPENAPI_SPEC=<路径或URL>`，当命令行未提供时生效。
+
+示例：
+
+```bash
+poetry run mcp-cnb-knowledge --openapi-spec ./openapi.yaml
+# 或
+export MCP_OPENAPI_SPEC="https://api.example.com/openapi.json"
+poetry run mcp-cnb-knowledge
+```
 
 ## API 工具
 
@@ -86,8 +104,10 @@ mcp-cnb-knowledge/
 ├── src/
 │   └── mcp_cnb_knowledge/
 │       ├── __init__.py
+│       ├── config.py           # CLI 与环境变量解析
 │       ├── server.py           # 主服务器实现
-│       └── openapi.yaml        # OpenAPI 规范
+│       ├── spec_loader.py      # OpenAPI 规范加载与缓存
+│       └── openapi.yaml        # 示例 OpenAPI 规范（仅供本地调试）
 ├── tests/
 │   ├── __init__.py
 │   └── test_server.py
@@ -101,7 +121,7 @@ mcp-cnb-knowledge/
 ## 技术栈
 
 - [FastMCP](https://github.com/jlowin/fastmcp) - MCP 服务器框架
-- [httpx](https://www.python-httpx.org/) - 异步 HTTP 客户端
+- [httpx](https://www.python-httpx.org/) - 异步 HTTP 客户端与规范下载
 - [PyYAML](https://pyyaml.org/) - YAML 解析器
 
 ## 常见问题

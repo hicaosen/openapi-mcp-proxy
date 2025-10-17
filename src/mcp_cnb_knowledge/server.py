@@ -1,28 +1,29 @@
-"""CNB Knowledge Base MCP Server
+"""CNB Knowledge Base MCP Server.
 
-基于FastMCP实现的CNB知识库查询服务器，支持通过RAG技术检索仓库文档内容。
+基于 FastMCP 实现的 CNB 知识库查询服务器，支持通过 RAG 技术检索仓库文档内容。
 """
 
+from __future__ import annotations
+
 import os
+import sys
+from typing import Optional
+
 import httpx
-import yaml
 from fastmcp import FastMCP
-from importlib.resources import files
+
+from .config import OPENAPI_SPEC_ENV_VAR, parse_openapi_source
+from .spec_loader import OpenAPISpecError, OpenAPISpecLoader
 
 
-def load_openapi_spec() -> dict:
-    """加载OpenAPI规范文件"""
-    # 使用importlib.resources从包中加载openapi.yaml
-    try:
-        package_files = files("mcp_cnb_knowledge")
-        openapi_file = package_files.joinpath("openapi.yaml")
-        spec_content = openapi_file.read_text(encoding="utf-8")
-        return yaml.safe_load(spec_content)
-    except FileNotFoundError:
-        raise FileNotFoundError(
-            "OpenAPI规范文件未找到\n"
-            "请确保包中包含 openapi.yaml 文件"
-        )
+_spec_loader = OpenAPISpecLoader()
+_OPENAPI_SOURCE: Optional[str] = None
+
+
+def load_openapi_spec(source: str) -> dict:
+    """根据来源加载 OpenAPI 规范。"""
+
+    return _spec_loader.load(source)
 
 
 def get_cnb_token() -> str:
@@ -38,10 +39,18 @@ def get_cnb_token() -> str:
     return token
 
 
-def create_mcp_server() -> FastMCP:
+def create_mcp_server(openapi_source: str | None = None) -> FastMCP:
     """创建并配置MCP服务器"""
-    # 加载OpenAPI规范
-    openapi_spec = load_openapi_spec()
+    # 确定 OpenAPI 规范来源
+    source = openapi_source or os.getenv(OPENAPI_SPEC_ENV_VAR)
+    if not source:
+        raise OpenAPISpecError(
+            "未提供 OpenAPI 规范来源，请通过 --openapi-spec 参数或设置 "
+            f"{OPENAPI_SPEC_ENV_VAR} 环境变量。"
+        )
+
+    # 加载 OpenAPI 规范
+    openapi_spec = load_openapi_spec(source)
 
     # 获取CNB访问令牌
     token = get_cnb_token()
@@ -57,31 +66,62 @@ def create_mcp_server() -> FastMCP:
     )
 
     # 从OpenAPI规范创建MCP服务器
-    mcp = FastMCP.from_openapi(
+    return FastMCP.from_openapi(
         openapi_spec=openapi_spec,
         client=api_client,
         name="CNB Knowledge Base",
     )
 
-    return mcp
-
 
 # 延迟创建MCP服务器实例（只在需要时创建）
-_mcp_instance = None
+_mcp_instance: Optional[FastMCP] = None
 
 
-def get_mcp_instance() -> FastMCP:
+def get_mcp_instance(openapi_source: str | None = None) -> FastMCP:
     """获取或创建MCP服务器实例（单例模式）"""
-    global _mcp_instance
+    global _mcp_instance, _OPENAPI_SOURCE
+
+    if openapi_source is not None:
+        if _OPENAPI_SOURCE is None:
+            _OPENAPI_SOURCE = openapi_source
+        elif openapi_source != _OPENAPI_SOURCE:
+            raise RuntimeError(
+                "MCP服务器实例已创建，且 OpenAPI 规范来源不同。如需切换，"
+                "请重启进程。"
+            )
+
+    create_source = _OPENAPI_SOURCE if _OPENAPI_SOURCE is not None else openapi_source
+    if create_source is None:
+        create_source = os.getenv(OPENAPI_SPEC_ENV_VAR)
+
     if _mcp_instance is None:
-        _mcp_instance = create_mcp_server()
+        _mcp_instance = create_mcp_server(openapi_source=create_source)
+        if _OPENAPI_SOURCE is None:
+            _OPENAPI_SOURCE = create_source
     return _mcp_instance
 
 
 # 为了兼容 project.scripts 入口点，提供一个便捷函数
-def run():
+def run(argv: list[str] | None = None):
     """运行MCP服务器的入口函数"""
-    mcp = get_mcp_instance()
+    if argv is None:
+        argv = sys.argv[1:]
+
+    try:
+        source, remaining = parse_openapi_source(argv, os.environ)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
+
+    # 将未消费的参数写回 sys.argv，避免影响后续逻辑
+    sys.argv = [sys.argv[0], *remaining]
+
+    try:
+        mcp = get_mcp_instance(openapi_source=source)
+    except OpenAPISpecError as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(1) from exc
+
     mcp.run()
 
 
