@@ -1,7 +1,7 @@
 [project]
-name = "mcp-cnb-knowledge"
-version = "0.1.0"
-description = "CNB Knowledge Base MCP Server - Query CNB repository documentation using RAG"
+name = "openapi-mcp-proxy"
+version = "0.2.0"
+description = "Generic OpenAPI → MCP proxy for MCP clients"
 authors = [
     {name = "hicaosen",email = "cscg52@qq.com"}
 ]
@@ -14,10 +14,10 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-cnb-knowledge = "mcp_cnb_knowledge.server:run"
+openapi-mcp-proxy = "openapi_mcp_proxy.server:run"
 
 [tool.poetry]
-packages = [{include = "mcp_cnb_knowledge", from = "src"}]
+packages = [{include = "openapi_mcp_proxy", from = "src"}]
 
 
 [tool.poetry.group.dev.dependencies]

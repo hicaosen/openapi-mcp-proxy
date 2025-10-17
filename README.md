@@ -1,157 +1,156 @@
-# CNB Knowledge Base MCP Server
+# OpenAPI → MCP Proxy
 
-基于 FastMCP 实现的 CNB 知识库查询服务器，支持通过 RAG（检索增强生成）技术检索 CNB 仓库文档内容。
+This project turns any OpenAPI specification into a fully fledged MCP server. It
+builds on [FastMCP](https://github.com/jlowin/fastmcp) while providing
+configuration primitives, authentication helpers, and runtime factories that are
+decoupled from any specific upstream platform.
 
-## 特性
+## Features
 
-- 🚀 基于 [FastMCP](https://github.com/jlowin/fastmcp) 框架快速构建
-- 🔍 支持通过 RAG 技术智能检索仓库文档
-- 🔌 兼容所有 MCP 客户端（Claude Desktop、Cline 等）
-- 📚 自动从 OpenAPI 规范生成工具定义
-- ⚡ 异步 HTTP 客户端，性能优异
+- **Modular core**: clearly separated modules for configuration, spec loading,
+  authentication, HTTP client creation, and server orchestration.
+- **Configurable runtime**: merge command-line flags, environment variables, and
+  optional config files into a single `RuntimeConfig` object.
+- **Extensible authentication**: built-in support for bearer tokens, API keys,
+  custom headers, and basic auth, with room for future plugins.
+- **Extensible defaults**: bring your own base URLs, headers, and auth schemes
+  without touching the core runtime.
+- **Async HTTP client**: `httpx.AsyncClient` factory with configurable
+  timeouts, retries, and default headers derived from the OpenAPI spec.
 
-## 前置要求
+## Quick start
 
-- Python 3.12 或更高版本
-- CNB 访问令牌（需要 `repo-code:r` 权限）
+1. Provide an OpenAPI schema (local file or URL).
+2. Install dependencies (`pip install .` or `poetry install`).
+3. Launch the proxy:
 
-## 安装
+   ```bash
+   openapi-mcp-proxy --openapi-spec ./petstore.yaml --server-name "Petstore"
+   ```
 
-### 方法 1：通过 uvx 直接运行（推荐）
+   The command reads configuration from CLI flags, environment variables, and
+   optional config files. Remaining arguments are preserved and can be consumed
+   by MCP clients if needed.
 
-无需安装，MCP 客户端会自动处理：
+You can also embed the server inside a Python project:
+
+```python
+from openapi_mcp_proxy import RuntimeConfig, create_proxy
+
+config = RuntimeConfig(openapi_source="./petstore.yaml")
+proxy = create_proxy(config)
+proxy.run()
+```
+
+### Claude Desktop 示例配置
+
+在 `claude_desktop_config.json` 中注册 MCP 服务器：
 
 ```json
 {
   "mcpServers": {
-    "cnb-knowledge": {
-      "type": "stdio",
+    "openapi-mcp-proxy": {
       "command": "uvx",
       "args": [
         "--prerelease=allow",
         "--from",
-        "git+https://cnb.cool/hicaosen/mcp-cnb-knowledge",
-        "mcp-cnb-knowledge",
+        "git+https://cnb.cool/hicaosen/openapi-mcp-proxy",
+        "openapi-mcp-proxy",
         "--openapi-spec",
-        "https://example.com/openapi.yaml"
+        "https://example.com/openapi.yaml",
+        "--server-name",
+        "My OpenAPI Proxy",
+        "--base-url",
+        "https://api.example.com"
       ],
       "env": {
-        "CNB_ACCESS_TOKEN": "your_token_here"
+        "MCP_PROXY_TIMEOUT": "30",
+        "MCP_PROXY_VERIFY_SSL": "true"
       }
     }
   }
 }
 ```
 
-## 配置
+如需认证，可再补充诸如 `MCP_PROXY_AUTH_TYPE`、`MCP_PROXY_AUTH_TOKEN` 等环境变量。
 
-### 获取 CNB 访问令牌
+## Runtime configuration
 
-1. 访问 https://cnb.cool/-/user/tokens
-2. 创建新的访问令牌，至少需要 `repo-code:r` 权限
-3. 复制生成的令牌
+### CLI options
 
-### 指定 OpenAPI 规范
+| Flag | Description |
+| ---- | ----------- |
+| `--openapi-spec` | Path or URL to the OpenAPI document (required unless supplied via env/config). |
+| `--config` | Path to a YAML/JSON config file used as a base. |
+| `--server-name` | Name for the MCP server (defaults to `OpenAPI MCP Proxy`). |
+| `--base-url` | Override the base URL derived from the spec `servers` array. |
+| `--timeout` | HTTP timeout in seconds (default `30`). |
+| `--verify-ssl`/`--no-verify-ssl` | Toggle TLS certificate verification. |
+| `--retries` | Number of automatic retries for the HTTP client. |
+| `--proxy` | Proxy configuration passed to `httpx` (URL or JSON mapping). |
+| `--header` | Extra default header (`KEY=VALUE`). Repeat for multiple entries. |
+| `--auth-type` | Authentication scheme: `none`, `bearer`, `basic`, `header`, `api-key`. |
+| `--auth-token` | Token for bearer auth. |
+| `--auth-username` / `--auth-password` | Credentials for basic auth. |
+| `--auth-header` | Custom auth header (`KEY=VALUE`). Repeatable. |
+| `--auth-key-name` / `--auth-key-value` | API key name and secret. |
+| `--auth-key-location` | Where to inject the API key (`header`, `query`, `cookie`). |
 
-运行服务器时必须指定 OpenAPI 规范的来源（支持本地路径、`file://`、`http(s)://`）：
+### Environment variables
 
-- **命令行参数**：启动时传入 `--openapi-spec <路径或URL>`。
-- **环境变量**：设置 `MCP_OPENAPI_SPEC=<路径或URL>`，当命令行未提供时生效。
+All environment variables share the `MCP_PROXY_` prefix. The most important
+ones are:
 
-示例：
+- `MCP_PROXY_SPEC` (alias: `MCP_OPENAPI_SPEC`): OpenAPI location.
+- `MCP_PROXY_SERVER_NAME`: override server name.
+- `MCP_PROXY_BASE_URL`: override base URL.
+- `MCP_PROXY_TIMEOUT`, `MCP_PROXY_RETRIES`, `MCP_PROXY_VERIFY_SSL`.
+- `MCP_PROXY_HEADERS`: comma-separated list of `KEY=VALUE` pairs.
+- `MCP_PROXY_AUTH_TYPE`, `MCP_PROXY_AUTH_TOKEN`, `MCP_PROXY_AUTH_USERNAME`,
+  `MCP_PROXY_AUTH_PASSWORD`, `MCP_PROXY_AUTH_HEADERS`, `MCP_PROXY_AUTH_KEY_NAME`,
+  `MCP_PROXY_AUTH_KEY_VALUE`, `MCP_PROXY_AUTH_KEY_LOCATION`.
 
-```bash
-poetry run mcp-cnb-knowledge --openapi-spec ./openapi.yaml
-# 或
-export MCP_OPENAPI_SPEC="https://api.example.com/openapi.json"
-poetry run mcp-cnb-knowledge
+Environment values are merged with any config file provided and finally with CLI
+flags (which take precedence).
+
+### Config file example
+
+```yaml
+openapi_spec: ./petstore.yaml
+server_name: Petstore Proxy
+base_url: https://petstore.swagger.io/v2
+timeout: 45
+headers:
+  - X-Debug=true
+auth_type: api-key
+auth_key_name: X-API-Key
+auth_key_value: ${PETSTORE_API_KEY}
 ```
 
-## API 工具
+Pass the file with `--config config.yaml`. Environment variables and CLI flags
+still override individual fields.
 
-### queryKnowledgeBase
+## Authentication strategies
 
-在指定仓库的知识库中搜索相关文档片段。
+Authentication is described by `AuthConfig`. The HTTP client factory converts it
+into headers, cookies, query parameters, or `httpx` auth handlers.
 
-**参数：**
+- **Bearer**: `Authorization: Bearer <token>`.
+- **Basic**: `httpx.BasicAuth(username, password)`.
+- **Header**: arbitrary header pairs via `--auth-header` / `MCP_PROXY_AUTH_HEADERS`.
+- **API Key**: inject into headers, query string, or cookies.
+- **None**: no additional credentials.
 
-- `slug` (string, 必需): 仓库路径，格式为 `owner/repo`
-- `query` (string, 必需): 搜索关键词或问题
-- `top_k` (integer, 可选): 最大返回结果数，默认 5，范围 1-20
+Additional headers defined in the auth configuration are merged with global
+headers so you can mix concerns when needed.
 
-**返回示例：**
+## Development
 
-```json
-[
-  {
-    "score": 0.95,
-    "chunk": "文档内容片段...",
-    "metadata": {
-      "hash": "abc123",
-      "name": "README.md",
-      "path": "docs/README.md"
-    }
-  }
-]
-```
+- The project targets Python 3.12+.
+- Install dependencies via `poetry install` or `pip install -e .[dev]`.
+- Run tests with `pytest`.
+- Source code lives under `src/openapi_mcp_proxy/` and is organised into
+  `core/` plus package-level convenience APIs.
 
-## 开发
-
-### 项目结构
-
-```
-mcp-cnb-knowledge/
-├── src/
-│   └── mcp_cnb_knowledge/
-│       ├── __init__.py
-│       ├── config.py           # CLI 与环境变量解析
-│       ├── server.py           # 主服务器实现
-│       ├── spec_loader.py      # OpenAPI 规范加载与缓存
-│       └── openapi.yaml        # 示例 OpenAPI 规范（仅供本地调试）
-├── tests/
-│   ├── __init__.py
-│   └── test_server.py
-├── examples/
-│   └── query_example.py        # 使用示例
-├── pyproject.toml              # 项目配置
-├── .env.example                # 环境变量示例
-└── README.md
-```
-
-## 技术栈
-
-- [FastMCP](https://github.com/jlowin/fastmcp) - MCP 服务器框架
-- [httpx](https://www.python-httpx.org/) - 异步 HTTP 客户端与规范下载
-- [PyYAML](https://pyyaml.org/) - YAML 解析器
-
-## 常见问题
-
-### 1. 认证失败（401 错误）
-
-检查你的 `CNB_ACCESS_TOKEN` 是否正确配置且具有 `repo-code:r` 权限。
-
-### 2. 仓库不存在或知识库未构建（404 错误）
-
-确认：
-- 仓库路径格式正确（`owner/repo`）
-- 仓库已启用知识库功能
-- 你有权限访问该仓库
-
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
-
-## 许可证
-
-本项目采用 MIT 许可证。
-
-## 作者
-
-- **hicaosen** - [cscg52@qq.com](mailto:cscg52@qq.com)
-
-## 相关链接
-
-- [CNB 平台](https://cnb.cool)
-- [FastMCP 文档](https://github.com/jlowin/fastmcp)
-- [MCP 协议规范](https://modelcontextprotocol.io)
+Contributions are welcome—feel free to open issues or pull requests with ideas
+for additional authentication schemes or client-side plugins.

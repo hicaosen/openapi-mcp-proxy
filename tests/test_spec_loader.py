@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from mcp_cnb_knowledge.spec_loader import OpenAPISpecError, OpenAPISpecLoader
+from openapi_mcp_proxy.core.spec import OpenAPISpecError, OpenAPISpecLoader
 
 
 SAMPLE_SPEC = """openapi: 3.0.3
@@ -83,7 +83,7 @@ def test_loader_fetches_http_yaml(monkeypatch: pytest.MonkeyPatch):
                 request=httpx.Request("GET", url),
             )
 
-    monkeypatch.setattr("mcp_cnb_knowledge.spec_loader.httpx.Client", DummyClient)
+    monkeypatch.setattr("openapi_mcp_proxy.core.spec.httpx.Client", DummyClient)
 
     spec = loader.load("https://example.com/openapi.yaml")
     assert spec["info"]["title"] == "Loader Test"
@@ -105,7 +105,7 @@ def test_loader_http_error(monkeypatch: pytest.MonkeyPatch):
         def get(self, url: str):
             return httpx.Response(500, text="error", request=httpx.Request("GET", url))
 
-    monkeypatch.setattr("mcp_cnb_knowledge.spec_loader.httpx.Client", ErrorClient)
+    monkeypatch.setattr("openapi_mcp_proxy.core.spec.httpx.Client", ErrorClient)
 
     with pytest.raises(OpenAPISpecError, match="HTTP 错误"):
         loader.load("https://example.com/openapi.yaml")
@@ -127,7 +127,7 @@ def test_loader_http_timeout(monkeypatch: pytest.MonkeyPatch):
         def get(self, url: str):
             raise httpx.TimeoutException("timeout")
 
-    monkeypatch.setattr("mcp_cnb_knowledge.spec_loader.httpx.Client", TimeoutClient)
+    monkeypatch.setattr("openapi_mcp_proxy.core.spec.httpx.Client", TimeoutClient)
 
     with pytest.raises(OpenAPISpecError, match="超时"):
         loader.load("https://example.com/openapi.yaml")
