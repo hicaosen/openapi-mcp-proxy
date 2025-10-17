@@ -166,7 +166,7 @@ def load_runtime_config(
 def _load_config_file(path: str) -> dict[str, Any]:
     location = Path(path)
     if not location.exists():
-        raise ConfigError(f"指定的配置文件不存在: {path}")
+        raise ConfigError(f"Specified configuration file does not exist: {path}")
 
     content = location.read_text(encoding="utf-8")
     suffix = location.suffix.lower()
@@ -182,7 +182,7 @@ def _load_config_file(path: str) -> dict[str, Any]:
             data = json.loads(content)
 
     if not isinstance(data, MutableMapping):
-        raise ConfigError("配置文件内容必须是对象/字典结构")
+        raise ConfigError("Configuration file content must be an object/dictionary structure")
 
     return dict(data)
 
@@ -266,8 +266,8 @@ def _resolve_openapi_source(merged: Mapping[str, Any], env: Mapping[str, str]) -
         return env_alias
 
     raise ConfigError(
-        "未提供 OpenAPI 规范来源，请通过 --openapi-spec 参数、"
-        f"{ENV_PREFIX}SPEC/{OPENAPI_SPEC_ENV_VAR} 环境变量或配置文件指定。"
+        "No OpenAPI specification source provided. Please specify via --openapi-spec parameter, "
+        f"{ENV_PREFIX}SPEC/{OPENAPI_SPEC_ENV_VAR} environment variable, or configuration file."
     )
 
 
@@ -291,19 +291,19 @@ def _build_auth_config(data: Mapping[str, Any]) -> AuthConfig:
     if scheme == "bearer":
         token = data.get("auth_token")
         if not token:
-            raise ConfigError("Bearer 认证需要提供 auth_token")
+            raise ConfigError("Bearer authentication requires auth_token")
         config.token = str(token)
     elif scheme == "basic":
         username = data.get("auth_username")
         password = data.get("auth_password")
         if username is None or password is None:
-            raise ConfigError("Basic 认证需要提供用户名和密码")
+            raise ConfigError("Basic authentication requires username and password")
         config.username = str(username)
         config.password = str(password)
     elif scheme == "header":
         headers = data.get("auth_headers")
         if not headers:
-            raise ConfigError("Header 认证需要至少一个 --auth-header")
+            raise ConfigError("Header authentication requires at least one --auth-header")
         for raw in headers:
             key, value = _parse_key_value(raw)
             if config.header_name is None:
@@ -314,12 +314,12 @@ def _build_auth_config(data: Mapping[str, Any]) -> AuthConfig:
     elif scheme == "api-key":
         key_value = data.get("auth_key_value")
         if key_value is None:
-            raise ConfigError("API Key 认证需要提供 auth_key_value")
+            raise ConfigError("API Key authentication requires auth_key_value")
         config.api_key_value = str(key_value)
         config.api_key_name = str(data.get("auth_key_name") or "X-API-Key")
         location = str(data.get("auth_key_location") or "header")
         if location not in {"header", "query", "cookie"}:
-            raise ConfigError("API Key 位置必须是 header/query/cookie 之一")
+            raise ConfigError("API Key location must be one of header/query/cookie")
         config.api_key_location = location
     else:
         # For none and any unknown scheme we keep defaults.
@@ -352,7 +352,7 @@ def _parse_bool(value: str) -> bool:
         return True
     if normalized in {"0", "false", "no", "off"}:
         return False
-    raise ConfigError(f"无法解析布尔值: {value}")
+    raise ConfigError(f"Cannot parse boolean value: {value}")
 
 
 def _parse_proxy_value(value: str) -> str | Mapping[str, str]:
@@ -360,7 +360,7 @@ def _parse_proxy_value(value: str) -> str | Mapping[str, str]:
     if value.startswith("{"):
         loaded = json.loads(value)
         if not isinstance(loaded, MutableMapping):
-            raise ConfigError("PROXIES 配置必须是映射对象")
+            raise ConfigError("PROXIES configuration must be a mapping object")
         return dict(loaded)
     return value
 
@@ -380,7 +380,7 @@ def _parse_key_value(raw: str) -> tuple[str, str]:
     elif ":" in raw:
         key, value = raw.split(":", 1)
     else:
-        raise ConfigError("头信息需要 KEY=VALUE 或 KEY:VALUE 形式")
+        raise ConfigError("Header must be in KEY=VALUE or KEY:VALUE format")
     return key.strip(), value.strip()
 
 

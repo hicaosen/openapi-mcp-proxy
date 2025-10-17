@@ -1,4 +1,4 @@
-"""测试 OpenAPI 规范加载器。"""
+"""Tests for the OpenAPI specification loader."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def test_loader_reads_yaml_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch)
 
     spec_second = loader.load(str(spec_path))
     assert spec_second["info"]["title"] == "Loader Test"
-    assert read_calls == 0  # 缓存命中，不会再次读取文件
+    assert read_calls == 0  # Cache hit, file will not be read again
 
 
 def test_loader_reads_json_file(tmp_path: Path):
@@ -59,7 +59,7 @@ def test_loader_reads_json_file(tmp_path: Path):
 def test_loader_missing_file_error(tmp_path: Path):
     loader = OpenAPISpecLoader()
 
-    with pytest.raises(OpenAPISpecError, match="不存在"):
+    with pytest.raises(OpenAPISpecError, match="does not exist"):
         loader.load(str(tmp_path / "missing.yaml"))
 
 
@@ -107,7 +107,7 @@ def test_loader_http_error(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr("openapi_mcp_proxy.core.spec.httpx.Client", ErrorClient)
 
-    with pytest.raises(OpenAPISpecError, match="HTTP 错误"):
+    with pytest.raises(OpenAPISpecError, match="HTTP Error"):
         loader.load("https://example.com/openapi.yaml")
 
 
@@ -129,12 +129,12 @@ def test_loader_http_timeout(monkeypatch: pytest.MonkeyPatch):
 
     monkeypatch.setattr("openapi_mcp_proxy.core.spec.httpx.Client", TimeoutClient)
 
-    with pytest.raises(OpenAPISpecError, match="超时"):
+    with pytest.raises(OpenAPISpecError, match="timeout"):
         loader.load("https://example.com/openapi.yaml")
 
 
 def test_loader_invalid_yaml(tmp_path: Path):
-    invalid = "openapi: ["  # 非法 YAML
+    invalid = "openapi: ["  # Invalid YAML
     spec_path = _write(tmp_path, "bad.yaml", invalid)
 
     loader = OpenAPISpecLoader()
@@ -144,7 +144,7 @@ def test_loader_invalid_yaml(tmp_path: Path):
 
 
 def test_loader_invalid_json(tmp_path: Path):
-    invalid = "{"  # 非法 JSON
+    invalid = "{"  # Invalid JSON
     spec_path = _write(tmp_path, "bad.json", invalid)
 
     loader = OpenAPISpecLoader()
@@ -156,5 +156,5 @@ def test_loader_invalid_json(tmp_path: Path):
 def test_loader_unknown_scheme():
     loader = OpenAPISpecLoader()
 
-    with pytest.raises(OpenAPISpecError, match="不支持"):
+    with pytest.raises(OpenAPISpecError, match="Unsupported"):
         loader.load("ftp://example.com/openapi.yaml")

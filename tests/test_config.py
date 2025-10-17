@@ -75,5 +75,5 @@ def test_missing_source_raises(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv(f"{ENV_PREFIX}SPEC", raising=False)
     monkeypatch.delenv(OPENAPI_SPEC_ENV_VAR, raising=False)
 
-    with pytest.raises(ConfigError, match="未提供 OpenAPI 规范来源"):
+    with pytest.raises(ConfigError, match="No OpenAPI specification source provided"):
         load_runtime_config([])

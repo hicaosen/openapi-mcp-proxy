@@ -49,7 +49,7 @@ class OpenAPISpecLoader:
             path = Path(source)
             return self._load_path(path, key)
 
-        raise OpenAPISpecError(f"不支持的 OpenAPI 规范来源: {source}")
+        raise OpenAPISpecError(f"Unsupported OpenAPI specification source: {source}")
 
     # Internal helpers -------------------------------------------------
 
@@ -75,11 +75,11 @@ class OpenAPISpecLoader:
                 response.raise_for_status()
         except httpx.TimeoutException as exc:
             raise OpenAPISpecError(
-                f"下载 OpenAPI 规范超时（{self.timeout}s）: {source}"
+                f"OpenAPI specification download timeout ({self.timeout}s): {source}"
             ) from exc
         except httpx.HTTPError as exc:
             raise OpenAPISpecError(
-                f"下载 OpenAPI 规范失败: {source}\nHTTP 错误: {exc}"
+                f"Failed to download OpenAPI specification: {source}\nHTTP Error: {exc}"
             ) from exc
 
         spec = self._parse_spec(response.text, Path(source).suffix.lower())
@@ -95,10 +95,10 @@ class OpenAPISpecLoader:
         try:
             stat = path.stat()
         except FileNotFoundError as exc:
-            raise OpenAPISpecError(f"OpenAPI 规范文件不存在: {path}") from exc
+            raise OpenAPISpecError(f"OpenAPI specification file does not exist: {path}") from exc
         except OSError as exc:
             raise OpenAPISpecError(
-                f"无法访问 OpenAPI 规范文件: {path}\n{exc}"
+                f"Cannot access OpenAPI specification file: {path}\n{exc}"
             ) from exc
 
         mtime = stat.st_mtime
@@ -110,7 +110,7 @@ class OpenAPISpecLoader:
             content = path.read_text(encoding="utf-8")
         except OSError as exc:
             raise OpenAPISpecError(
-                f"读取 OpenAPI 规范文件失败: {path}\n{exc}"
+                f"Failed to read OpenAPI specification file: {path}\n{exc}"
             ) from exc
 
         spec = self._parse_spec(content, path.suffix.lower())
@@ -132,21 +132,21 @@ class OpenAPISpecLoader:
         try:
             data = yaml.safe_load(content)
         except yaml.YAMLError as exc:
-            raise OpenAPISpecError("OpenAPI 规范不是有效的 YAML 格式") from exc
+            raise OpenAPISpecError("OpenAPI specification is not valid YAML format") from exc
         return self._validate_dict(data, "YAML")
 
     def _parse_json(self, content: str) -> dict:
         try:
             data = json.loads(content)
         except json.JSONDecodeError as exc:
-            raise OpenAPISpecError("OpenAPI 规范不是有效的 JSON 格式") from exc
+            raise OpenAPISpecError("OpenAPI specification is not valid JSON format") from exc
         return self._validate_dict(data, "JSON")
 
     @staticmethod
     def _validate_dict(data: object, source: str) -> dict:
         if not isinstance(data, dict):
             raise OpenAPISpecError(
-                f"解析 {source} 后的 OpenAPI 规范必须是对象类型"
+                f"Parsed OpenAPI specification from {source} must be an object type"
             )
         return data
 
@@ -154,12 +154,12 @@ class OpenAPISpecLoader:
     def _path_from_file_url(parsed: ParseResult) -> Path:
         if parsed.netloc and parsed.netloc not in {"", "localhost"}:
             raise OpenAPISpecError(
-                f"暂不支持带主机名的 file URL: {parsed.geturl()}"
+                f"File URLs with hostnames are not yet supported: {parsed.geturl()}"
             )
 
         path = url2pathname(parsed.path)
         if not path:
-            raise OpenAPISpecError("file:// URL 未提供路径信息")
+            raise OpenAPISpecError("file:// URL does not provide path information")
         return Path(path)
 
 

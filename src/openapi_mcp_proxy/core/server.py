@@ -27,7 +27,7 @@ def create_proxy(
 ) -> "FastMCPOpenAPI":
     if FastMCPOpenAPI is None:  # pragma: no cover - requires dependency
         raise RuntimeError(
-            "FastMCPOpenAPI 不可用，请确认 fastmcp 已安装且版本满足 OpenAPI 支持。"
+            "FastMCPOpenAPI is not available. Please ensure fastmcp is installed with OpenAPI support."
         )
 
     loader = loader or OpenAPISpecLoader()

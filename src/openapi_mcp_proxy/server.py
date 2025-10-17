@@ -34,12 +34,12 @@ def get_proxy_instance(config: RuntimeConfig | None = None):  # pragma: no cover
     global _registry
     if _registry is None:
         if config is None:
-            raise RuntimeError("未初始化代理实例，请先提供 RuntimeConfig。")
+            raise RuntimeError("Proxy instance not initialized. Please provide RuntimeConfig first.")
         _registry = ProxyRegistry(config=config)
     else:
         if config is not None and config.openapi_source != _registry.config.openapi_source:
             raise RuntimeError(
-                "MCP 代理已经基于不同的 OpenAPI 规范创建。如需切换，请重启进程。"
+                "MCP proxy has already been created based on a different OpenAPI specification. To switch, please restart the process."
             )
     return _registry.get()
 
