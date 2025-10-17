@@ -1,106 +1,129 @@
-"""测试 MCP 服务器模块。"""
+"""Server level tests for the OpenAPI → MCP proxy."""
 
 from __future__ import annotations
 
-import os
-from pathlib import Path
+import sys
+from typing import Any
 
 import pytest
 
-from mcp_cnb_knowledge.server import (
-    create_mcp_server,
-    get_cnb_token,
-    load_openapi_spec,
-)
-from mcp_cnb_knowledge.spec_loader import OpenAPISpecError
+import openapi_mcp_proxy.server as server_module
+from openapi_mcp_proxy.core.config import AuthConfig, ClientConfig, RuntimeConfig
+from openapi_mcp_proxy.server import create_proxy, get_proxy_instance, run
 
 
-SAMPLE_SPEC = """openapi: 3.0.3
-info:
-  title: Test API
-  version: 1.0.0
-paths:
-  /ping:
-    get:
-      operationId: ping
-      responses:
-        '200':
-          description: ok
-"""
+class DummyLoader:
+    def __init__(self, spec: dict[str, Any]):
+        self._spec = spec
+        self.calls: list[str] = []
+
+    def load(self, source: str) -> dict[str, Any]:
+        self.calls.append(source)
+        return self._spec
 
 
-def _write_spec(tmp_path: Path, name: str = "spec.yaml") -> Path:
-    spec_path = tmp_path / name
-    spec_path.write_text(SAMPLE_SPEC, encoding="utf-8")
-    return spec_path
+class DummyClient:
+    def __init__(self, **kwargs: Any):
+        self.kwargs = kwargs
 
 
-def test_load_openapi_spec_from_file(tmp_path: Path):
-    spec_path = _write_spec(tmp_path)
+class DummyProxy:
+    def __init__(self, *, openapi_spec: dict[str, Any], client: Any, name: str):
+        self.openapi_spec = openapi_spec
+        self.client = client
+        self.name = name
+        self.run_called = False
 
-    spec = load_openapi_spec(str(spec_path))
-
-    assert spec["openapi"] == "3.0.3"
-    assert spec["info"]["title"] == "Test API"
-    assert "/ping" in spec["paths"]
-
-
-def test_get_cnb_token_missing(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("CNB_ACCESS_TOKEN", raising=False)
-
-    with pytest.raises(ValueError, match="CNB_ACCESS_TOKEN环境变量未设置"):
-        get_cnb_token()
+    def run(self) -> None:
+        self.run_called = True
 
 
-def test_get_cnb_token_exists(monkeypatch: pytest.MonkeyPatch):
-    test_token = "test_token_12345"
-    monkeypatch.setenv("CNB_ACCESS_TOKEN", test_token)
+def test_create_proxy_uses_loader(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "openapi_mcp_proxy.core.client.httpx.AsyncClient",
+        lambda **kwargs: DummyClient(**kwargs),
+    )
+    monkeypatch.setattr(
+        "openapi_mcp_proxy.core.server.FastMCPOpenAPI",
+        DummyProxy,
+    )
 
-    token = get_cnb_token()
-    assert token == test_token
+    spec = {"servers": [{"url": "https://api.example"}]}
+    loader = DummyLoader(spec)
+    runtime = RuntimeConfig(
+        openapi_source="spec.yaml",
+        headers={"X-Test": "1"},
+        auth=AuthConfig(scheme="bearer", token="token"),
+        client=ClientConfig(timeout=5),
+    )
+
+    proxy = create_proxy(runtime, loader=loader)
+
+    assert loader.calls == ["spec.yaml"]
+    assert isinstance(proxy, DummyProxy)
+    assert proxy.openapi_spec is spec
+    assert proxy.name == runtime.server_name
+    assert proxy.client.kwargs["headers"]["Authorization"] == "Bearer token"
 
 
-def test_create_mcp_server_requires_source(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("MCP_OPENAPI_SPEC", raising=False)
-
-    with pytest.raises(OpenAPISpecError, match="未提供 OpenAPI 规范来源"):
-        create_mcp_server()
-
-
-def test_create_mcp_server_with_source(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
-    spec_path = _write_spec(tmp_path)
-    monkeypatch.setenv("CNB_ACCESS_TOKEN", "fake-token")
-
-    created = {}
-
-    class DummyMCP:
-        def __init__(self, *, openapi_spec, client, name):
-            self.openapi_spec = openapi_spec
-            self.client = client
-            self.name = name
-
-        def run(self):
-            pass
-
-    def fake_from_openapi(*, openapi_spec, client, name):
-        created["spec"] = openapi_spec
-        created["client"] = client
-        created["name"] = name
-        return DummyMCP(openapi_spec=openapi_spec, client=client, name=name)
-
-    class DummyAsyncClient:
-        def __init__(self, **kwargs):
-            self.kwargs = kwargs
+def test_run_invokes_proxy(monkeypatch: pytest.MonkeyPatch):
+    runtime = RuntimeConfig(openapi_source="spec.yaml")
+    dummy_proxy = DummyProxy(openapi_spec={}, client=DummyClient(), name="Proxy")
 
     monkeypatch.setattr(
-        "mcp_cnb_knowledge.server.FastMCP.from_openapi",
-        staticmethod(fake_from_openapi),
+        "openapi_mcp_proxy.server.load_runtime_config",
+        lambda argv: (runtime, ["--leftover"]),
     )
-    monkeypatch.setattr("mcp_cnb_knowledge.server.httpx.AsyncClient", DummyAsyncClient)
 
-    mcp = create_mcp_server(openapi_source=str(spec_path))
+    class DummyRegistry:
+        def __init__(self, config: RuntimeConfig, loader: Any):
+            self.config = config
+            self.loader = loader
 
-    assert isinstance(mcp, DummyMCP)
-    assert created["spec"]["info"]["title"] == "Test API"
-    assert created["name"] == "CNB Knowledge Base"
-    assert created["client"].kwargs["base_url"] == "https://api.cnb.cool"
+        def get(self) -> DummyProxy:
+            return dummy_proxy
+
+    monkeypatch.setattr(
+        "openapi_mcp_proxy.server.ProxyRegistry",
+        DummyRegistry,
+    )
+    monkeypatch.setattr(
+        "openapi_mcp_proxy.server.OpenAPISpecLoader",
+        lambda: object(),
+    )
+
+    original_argv = sys.argv[:]
+    try:
+        sys.argv = ["prog"]
+        run([])
+        assert sys.argv[1:] == ["--leftover"]
+    finally:
+        sys.argv = original_argv
+
+    assert dummy_proxy.run_called is True
+
+
+def test_get_proxy_instance_block_switch(monkeypatch: pytest.MonkeyPatch):
+    class DummyRegistry:
+        def __init__(self, config: RuntimeConfig):
+            self.config = config
+            self.proxy = DummyProxy(openapi_spec={}, client=DummyClient(), name="Proxy")
+
+        def get(self) -> DummyProxy:
+            return self.proxy
+
+    runtime = RuntimeConfig(openapi_source="spec.yaml")
+    server_module._registry = DummyRegistry(config=runtime)
+
+    assert get_proxy_instance() is server_module._registry.proxy
+
+    with pytest.raises(RuntimeError):
+        get_proxy_instance(RuntimeConfig(openapi_source="other.yaml"))
+
+    server_module._registry = None
+
+
+def teardown_module(module):  # type: ignore[unused-argument]
+    """Ensure module-level registry is reset between tests."""
+
+    server_module._registry = None
